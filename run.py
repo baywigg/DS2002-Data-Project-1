@@ -2,6 +2,7 @@ from csv_utils import *
 from json_utils import *
 import time
 import pandas as pd
+import sqlite3
 import sys
 
 df = pd.DataFrame()
@@ -18,24 +19,44 @@ if data_type not in ["CSV", "csv", "JSON", "json"]:
 
 # Handle CSV route
 if data_type in ["CSV", "csv"]:
-    df = pd.read_csv(read_csv(), dtype={"GameDay": "string", "GameID" : "int", "Player" : "string", "PlayerID" : "int", 
-                                "PlayerCode": "string", "TeamID" : "int", "Team" : "string", "OpponentID": "int", 
-                                "Opponent" : "string", "Location" : "string", "Division" : "string", "Conference" : "string", 
-                                "Playoffs" : "string", "WinOrLoss" : "string", "Starter" : "string", "PlayerType" : "string", 
-                                "PerfScore" : "string", "MIN" : "string", "PTS" : "int", "FGM" : "int", "FGA" : "int", 
-                                "3FM" : "int", "3FA" : "int", "FTM" : "int", "FTA" : "int", "REB" : "int", 
-                                "AST" : "int", "STL" : "int", "BLK" : "int", "OREB" : "int", "TO" : "int", 
-                                "PF" : "int"})
-    # Removing unneccesary data
-    print("Removing uneccessary data... \n")
-    # Filter out only the regular season
-    df = df[df["Playoffs"].isna()]
-    # Drop uneeded columns
-    df = df.drop(columns=["GameDay", "GameID", "PlayerID", "PlayerCode", "TeamID", "Team", "OpponentID", "Opponent", "Location", "Division", "Conference", "Playoffs", "WinOrLoss", "Starter", "PlayerType", "PerfScore", "MIN"])
+    try:
+        df = pd.read_csv(read_csv(), dtype={"GameDay": "string", "GameID" : "int", "Player" : "string", "PlayerID" : "int", 
+                                    "PlayerCode": "string", "TeamID" : "int", "Team" : "string", "OpponentID": "int", 
+                                    "Opponent" : "string", "Location" : "string", "Division" : "string", "Conference" : "string", 
+                                    "Playoffs" : "string", "WinOrLoss" : "string", "Starter" : "string", "PlayerType" : "string", 
+                                    "PerfScore" : "string", "MIN" : "string", "PTS" : "int", "FGM" : "int", "FGA" : "int", 
+                                    "3FM" : "int", "3FA" : "int", "FTM" : "int", "FTA" : "int", "REB" : "int", 
+                                    "AST" : "int", "STL" : "int", "BLK" : "int", "OREB" : "int", "TO" : "int", 
+                                    "PF" : "int"})
+    except Exception as e:
+        print(f"Failed to read CSV: {e}")
+        sys.exit()
+
+    print(f"Number of records in ingested data: {len(df)}")
     time.sleep(1)
+
+    print(f"Number of columns in ingested data: {len(df.columns)}")
+    time.sleep(1)
+
+    try:
+        # Removing unneccesary data
+        print("Removing unnecessary data... \n")
+        # Filter out only the regular season
+        df = df[df["Playoffs"].isna()]
+        # Drop uneeded columns
+        df = df.drop(columns=["GameDay", "GameID", "PlayerID", "PlayerCode", "TeamID", "Team", "OpponentID", "Opponent", "Location", "Division", "Conference", "Playoffs", "WinOrLoss", "Starter", "PlayerType", "PerfScore", "MIN"])
+        time.sleep(1)
+    except Exception as e:
+        print(f"Failed to remove unnecessary data: {e}")
+        sys.exit()
     
     # Get the max PPG from the dataframe
-    max_ppg = get_max_ppg(df)
+    try:
+        max_ppg = get_max_ppg(df)
+    except Exception as e:
+        print(f"Failed to get max PPG: {e}")
+        sys.exit()
+
     print(f"We will now filter out the players with a Points Per Game (PPG) average lower than what you specify! For reference, the maximum PPG is: {max_ppg} \n")
     while True:
         try:    
@@ -51,11 +72,82 @@ if data_type in ["CSV", "csv"]:
             print("\nEnsure to input an integer lower than the max PPG next time... \n")
 
     df = remove_low_ppg_players(df, ppg_lower_bound)
-    print(df)
 
+    print("\nCalculating efficiency rating (EFF)... \n")
+    try:
+    # Calculate the efficiency rating for each of the games present
+        df["EFF"] = df.apply(get_efficiency_rating, axis=1, result_type="expand")
+        time.sleep(1)
+    except Exception as e:
+        print(f"Failed to calculate EFF: {e}")
+        sys.exit()
+
+    print("\nCalculating averages for each player and ordering by EFF...\n")
+    try:
+        df = df.groupby("Player")[['PTS', 'FGM', 'FGA', '3FM', '3FA', 'FTM', 'FTA', 'REB', 'AST', 'STL', 'BLK', 'OREB', 'TO', 'PF', 'EFF']].mean().sort_values(by="EFF", ascending=False).reset_index()
+        time.sleep(1)
+    except Exception as e:
+        print(f"Failed to calculate player averages: {e}")
+        sys.exit()
+
+    print(f"Number of records in modified data: {len(df)}")
+    time.sleep(1)
+
+    print(f"Number of columns in modified data: {len(df.columns)}")
+    print(f"Columns: {list(df.columns)}")
+    time.sleep(1)
+    
 # Handle JSON route
 else:
     df = pd.read_json(get_json("", ""))
 
 
-# Save data as the user specifies
+# Handle output
+while True:
+    try:    
+        # Save data as the user specifies
+        output_type = int(input('''
+How would you like the output formatted?
+    1: JSON
+    2: CSV
+    3: SQLite
+Choose an option from above: '''))
+
+        if output_type not in [1, 2, 3]:
+            raise ValueError
+
+        break
+    except ValueError:
+        print("\n Choose a value from the list.")
+        time.sleep(0.5)
+
+# JSON
+if output_type == 1:
+    try:
+        file_path = input("\nChoose a file name for JSON file: ")
+        df.to_json(f"output/{file_path}.json", index=False)
+    except Exception as e:
+        print(f"Failed to output JSON file: {e}")
+        sys.exit()
+# CSV
+elif output_type == 2:
+    try:
+        file_path = input("\nChoose a file name for CSV file: ")
+        df.to_csv(f"output/{file_path}.csv", index=False)
+    except Exception as e:
+        print(f"Failed to output CSV file: {e}")
+        sys.exit()
+# SQLite
+else:
+    try:
+        file_path = input("\nChoose a file name for the SQLite database: ")
+        table_name = input("\nChoose a table name for the SQLite database: ")
+        conn = sqlite3.connect(f"output/{file_path}.db")
+        df.to_sql(table_name, conn, if_exists="replace", index=False)
+    except Exception as e:
+        print(f"Failed to output to SQLite database: {e}")
+        conn.close()
+        sys.exit()
+
+time.sleep(1)
+print("Success!")

@@ -17,4 +17,4 @@ def remove_low_ppg_players(df, lower_bound):
     return df[~df["Player"].isin(players_to_remove)]
 
 def get_efficiency_rating(row):
-    pass
+    return ((row["PTS"] + row["REB"] + row["AST"] + row["STL"] + row["BLK"]) - ((row["FGA"] - row["FGM"]) + (row["FTA"] - row["FTM"]) + row["TO"]))
