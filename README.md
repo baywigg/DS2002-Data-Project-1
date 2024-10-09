@@ -27,3 +27,10 @@ Then, finally, run
 ```
 pip install -r requirements.txt
 ```
+
+To run the ETL pipeline, just run
+
+```
+python3 run.py
+```
+And follow the instructions!
