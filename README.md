@@ -33,4 +33,9 @@ To run the ETL pipeline, just run
 ```
 python3 run.py
 ```
+
 And follow the instructions!
+
+All output data will be in the output subfolder. If this folder does not exist, the pipeline will not work.
+
+A list of cryptocurrencies can be found [here](https://coinmarketcap.com/all/views/all/).

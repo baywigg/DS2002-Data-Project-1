@@ -4,6 +4,7 @@ import time
 import pandas as pd
 import sqlite3
 import sys
+import json
 
 df = pd.DataFrame()
 
@@ -32,10 +33,10 @@ if data_type in ["CSV", "csv"]:
         print(f"Failed to read CSV: {e}")
         sys.exit()
 
-    print(f"Number of records in ingested data: {len(df)}")
+    print(f"\nNumber of records in ingested data: {len(df)}")
     time.sleep(1)
 
-    print(f"Number of columns in ingested data: {len(df.columns)}")
+    print(f"\nNumber of columns in ingested data: {len(df.columns)}")
     time.sleep(1)
 
     try:
@@ -90,16 +91,61 @@ if data_type in ["CSV", "csv"]:
         print(f"Failed to calculate player averages: {e}")
         sys.exit()
 
-    print(f"Number of records in modified data: {len(df)}")
+    print(f"\nNumber of records in modified data: {len(df)}")
     time.sleep(1)
 
-    print(f"Number of columns in modified data: {len(df.columns)}")
+    print(f"\nNumber of columns in modified data: {len(df.columns)}")
     print(f"Columns: {list(df.columns)}")
     time.sleep(1)
     
 # Handle JSON route
 else:
-    df = pd.read_json(get_json("", ""))
+    asset = input("\nChoose your cryptocurrency asset to receive data on (bitcoin, ethereum, dogecoin, etc.): ").lower()
+    interval = input("\nChoose the interval in which you would like to receive data (m1, m5, m15, m30, h1, h2, h6, h12, d1): ")
+
+    if interval not in ["m1", "m5", "m15", "m30", "h1", "h2", "h6", "h12", "d1"]:
+        print("\nInterval must be in (m1, m5, m15, m30, h1, h2, h6, h12, d1)")
+        sys.exit()
+
+    print("\nReceiving data from CoinCap API...")
+    response = get_json(asset, interval)
+
+    if not response:
+        print("\nYour asset or interval were not correct. Ensure the interval matches the format and the crypto exists.")
+        sys.exit()
+
+    df = pd.DataFrame(response["data"])
+    pd.to_numeric(df["priceUsd"])
+    pd.to_numeric(df["time"])
+
+    print(f"\nNumber of records in ingested data: {len(df)}")
+    time.sleep(1)
+
+    print(f"\nNumber of columns in ingested data: {len(df.columns)}")
+    time.sleep(1)
+
+    # Add column indicating the type of crypto being accessed
+    print("\nAdding asset column...")
+    time.sleep(1)
+    df["Asset"] = asset
+
+    # Add columns to track the time and price change between the previous row
+    print("\nCalculating the price and time changes...")
+    time.sleep(1)
+    try:
+        price_change, time_change = get_price_and_time_change(df)
+    except Exception as e:
+        print(f"Failed to calculate the price and time change: {e}")
+    
+    df["priceChange"] = price_change
+    df["timeChange"] = time_change
+
+    print(f"\nNumber of records in modified data: {len(df)}")
+    time.sleep(1)
+
+    print(f"\nNumber of columns in modified data: {len(df.columns)}")
+    print(f"Columns: {list(df.columns)}")
+    time.sleep(1)
 
 
 # Handle output
@@ -150,4 +196,4 @@ else:
         sys.exit()
 
 time.sleep(1)
-print("Success!")
+print("\nSuccess!")
