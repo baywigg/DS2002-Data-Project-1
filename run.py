@@ -4,7 +4,11 @@ import time
 import pandas as pd
 import sqlite3
 import sys
+import os
 import json
+
+if not os.path.exists("./output"):
+    os.mkdir("./output")
 
 df = pd.DataFrame()
 
